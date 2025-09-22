@@ -1,0 +1,9 @@
+        # 发送控制状态
+        self.send_con = {
+            'recv_send_en': False, 接收标识符合
+            'fram_type': 0,
+            'unnormal_send_en': False,
+            'netman_send_en': False,
+            'poll_ok': True,
+            'currend_id': 0
+        }

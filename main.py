@@ -1,251 +1,108 @@
-import asyncio
-import socket
-import threading
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import queue
-import configparser
+import threading
 import logging
-import json
-from datetime import datetime
-from enum import Enum
-from dataclasses import dataclass
-from typing import Optional, Dict, Any
+import signal
+import sys
+from typing import Dict, Any
 
-
-class MessageSource(Enum):
-    """ÏûÏ¢À´Ô´Ã¶¾Ù"""
-    HOST_SOFTWARE = "host_software"
-    GATEWAY = "gateway"
-    LORA = "lora"
-
-
-@dataclass
-class UDPMessage:
-    """UDPÏûÏ¢Êı¾İÀà"""
-    source: MessageSource
-    data: bytes
-    addr: tuple
-    timestamp: datetime
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            'source': self.source.value,
-            'data': self.data.decode('utf-8', errors='ignore'),
-            'addr': self.addr,
-            'timestamp': self.timestamp.isoformat()
-        }
-
-
-class ConfigManager:
-    """ÅäÖÃ¹ÜÀíÆ÷"""
-    
-    def __init__(self, config_file: str = 'config.ini'):
-        self.config = configparser.ConfigParser()
-        self.config_file = config_file
-        self.load_config()
-    
-    def load_config(self):
-        """¼ÓÔØÅäÖÃÎÄ¼ş"""
-        try:
-            self.config.read(self.config_file, encoding='utf-8')
-        except Exception as e:
-            logging.error(f"¼ÓÔØÅäÖÃÎÄ¼şÊ§°Ü: {e}")
-            # Ê¹ÓÃÄ¬ÈÏÅäÖÃ
-            self._create_default_config()
-    
-    def _create_default_config(self):
-        """´´½¨Ä¬ÈÏÅäÖÃ"""
-        self.config['UDP_PORTS'] = {
-            'host_software_port': '8001',
-            'gateway_port': '8002',
-            'lora_port': '8003'
-        }
-        self.config['NETWORK'] = {
-            'bind_ip': '0.0.0.0'
-        }
-        self.config['LOGGING'] = {
-            'log_level': 'INFO',
-            'log_file': 'backend.log'
-        }
-    
-    def get_port(self, port_name: str) -> int:
-        """»ñÈ¡¶Ë¿ÚºÅ"""
-        return self.config.getint('UDP_PORTS', port_name)
-    
-    def get_bind_ip(self) -> str:
-        """»ñÈ¡°ó¶¨IP"""
-        return self.config.get('NETWORK', 'bind_ip')
-
-
-class UDPServer:
-    """UDP·şÎñÆ÷Àà"""
-    
-    def __init__(self, port: int, source: MessageSource, message_queue: queue.Queue, bind_ip: str = '0.0.0.0'):
-        self.port = port
-        self.source = source
-        self.message_queue = message_queue
-        self.bind_ip = bind_ip
-        self.socket = None
-        self.running = False
-        self.thread = None
-        
-    def start(self):
-        """Æô¶¯UDP·şÎñÆ÷"""
-        if self.running:
-            return
-            
-        try:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.socket.bind((self.bind_ip, self.port))
-            self.socket.settimeout(1.0)  # ÉèÖÃ³¬Ê±£¬±ãÓÚÓÅÑÅ¹Ø±Õ
-            
-            self.running = True
-            self.thread = threading.Thread(target=self._run, daemon=True)
-            self.thread.start()
-            
-            logging.info(f"{self.source.value} UDP·şÎñÆ÷Æô¶¯ÔÚ¶Ë¿Ú {self.port}")
-            
-        except Exception as e:
-            logging.error(f"Æô¶¯ {self.source.value} UDP·şÎñÆ÷Ê§°Ü: {e}")
-            raise
-    
-    def stop(self):
-        """Í£Ö¹UDP·şÎñÆ÷"""
-        self.running = False
-        if self.socket:
-            self.socket.close()
-        if self.thread and self.thread.is_alive():
-            self.thread.join(timeout=2)
-        logging.info(f"{self.source.value} UDP·şÎñÆ÷ÒÑÍ£Ö¹")
-    
-    def _run(self):
-        """UDP·şÎñÆ÷Ö÷Ñ­»·"""
-        while self.running:
-            try:
-                data, addr = self.socket.recvfrom(4096)
-                if data:
-                    message = UDPMessage(
-                        source=self.source,
-                        data=data,
-                        addr=addr,
-                        timestamp=datetime.now()
-                    )
-                    
-                    # ½«ÏûÏ¢·ÅÈë¶ÓÁĞ
-                    try:
-                        self.message_queue.put(message, timeout=0.1)
-                        logging.debug(f"ÊÕµ½À´×Ô {self.source.value} µÄÏûÏ¢: {len(data)} bytes from {addr}")
-                    except queue.Full:
-                        logging.warning(f"ÏûÏ¢¶ÓÁĞÒÑÂú£¬¶ªÆúÀ´×Ô {self.source.value} µÄÏûÏ¢")
-                        
-            except socket.timeout:
-                continue
-            except Exception as e:
-                if self.running:
-                    logging.error(f"{self.source.value} UDP·şÎñÆ÷´íÎó: {e}")
-
-
-class MessageProcessor:
-    """ÏûÏ¢´¦ÀíÆ÷"""
-    
-    def __init__(self, message_queue: queue.Queue):
-        self.message_queue = message_queue
-        self.running = False
-        self.thread = None
-        
-    def start(self):
-        """Æô¶¯ÏûÏ¢´¦ÀíÆ÷"""
-        if self.running:
-            return
-            
-        self.running = True
-        self.thread = threading.Thread(target=self._process_messages, daemon=True)
-        self.thread.start()
-        logging.info("ÏûÏ¢´¦ÀíÆ÷ÒÑÆô¶¯")
-    
-    def stop(self):
-        """Í£Ö¹ÏûÏ¢´¦ÀíÆ÷"""
-        self.running = False
-        if self.thread and self.thread.is_alive():
-            self.thread.join(timeout=2)
-        logging.info("ÏûÏ¢´¦ÀíÆ÷ÒÑÍ£Ö¹")
-    
-    def _process_messages(self):
-        """ÏûÏ¢´¦ÀíÖ÷Ñ­»·"""
-        while self.running:
-            try:
-                message = self.message_queue.get(timeout=1)
-                self._handle_message(message)
-                self.message_queue.task_done()
-            except queue.Empty:
-                continue
-            except Exception as e:
-                logging.error(f"´¦ÀíÏûÏ¢Ê±³ö´í: {e}")
-    
-    def _handle_message(self, message: UDPMessage):
-        """´¦Àíµ¥¸öÏûÏ¢"""
-        try:
-            # ¸ù¾İÏûÏ¢À´Ô´½øĞĞ²»Í¬µÄ´¦Àí
-            if message.source == MessageSource.HOST_SOFTWARE:
-                self._handle_host_software_message(message)
-            elif message.source == MessageSource.GATEWAY:
-                self._handle_gateway_message(message)
-            elif message.source == MessageSource.LORA:
-                self._handle_lora_message(message)
-            else:
-                logging.warning(f"Î´ÖªÏûÏ¢À´Ô´: {message.source}")
-                
-        except Exception as e:
-            logging.error(f"´¦Àí {message.source.value} ÏûÏ¢Ê§°Ü: {e}")
-    
-    def _handle_host_software_message(self, message: UDPMessage):
-        """´¦ÀíÉÏÎ»»úÈí¼şÏûÏ¢"""
-        logging.info(f"´¦ÀíÉÏÎ»»úÏûÏ¢: {len(message.data)} bytes from {message.addr}")
-        # TODO: ÊµÏÖ¾ßÌåµÄÉÏÎ»»úÏûÏ¢´¦ÀíÂß¼­
-        
-    def _handle_gateway_message(self, message: UDPMessage):
-        """´¦ÀíÍø¹ØÏûÏ¢"""
-        logging.info(f"´¦ÀíÍø¹ØÏûÏ¢: {len(message.data)} bytes from {message.addr}")
-        # TODO: ÊµÏÖ¾ßÌåµÄÍø¹ØÏûÏ¢´¦ÀíÂß¼­
-        
-    def _handle_lora_message(self, message: UDPMessage):
-        """´¦ÀíLoRaÏûÏ¢"""
-        logging.info(f"´¦ÀíLoRaÏûÏ¢: {len(message.data)} bytes from {message.addr}")
-        # TODO: ÊµÏÖ¾ßÌåµÄLoRaÏûÏ¢´¦ÀíÂß¼­
+from config import ConfigManager
+from protocol import MessageSource
+from udp_server import UDPServer
+from message_processor import MessageProcessor
 
 
 class BackendServer:
-    """ºóÌ¨·şÎñÆ÷Ö÷Àà"""
+    """åå°æœåŠ¡å™¨ä¸»ç±»"""
     
     def __init__(self, config_file: str = 'config.ini'):
         self.config_manager = ConfigManager(config_file)
-        self.message_queue = queue.Queue(maxsize=1000)  # ÉèÖÃ¶ÓÁĞ×î´ó´óĞ¡
+        self.message_queue = queue.Queue(maxsize=1000)  # è®¾ç½®é˜Ÿåˆ—æœ€å¤§å¤§å°
         self.servers = {}
         self.message_processor = MessageProcessor(self.message_queue)
+        self.running = False
         
-        # ÉèÖÃÈÕÖ¾
-        self._setup_logging()
+        # è®¾ç½®æ—¥å¿—
+        self.config_manager.setup_logging()
         
-    def _setup_logging(self):
-        """ÉèÖÃÈÕÖ¾"""
-        log_level = getattr(logging, self.config_manager.config.get('LOGGING', 'log_level', fallback='INFO'))
-        log_file = self.config_manager.config.get('LOGGING', 'log_file', fallback='backend.log')
+        # ä»é…ç½®æ–‡ä»¶åˆå§‹åŒ–èŠ‚ç‚¹
+        self._init_node_from_config()
         
-        logging.basicConfig(
-            level=log_level,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(log_file, encoding='utf-8'),
-                logging.StreamHandler()
-            ]
-        )
+        # è®¾ç½®ä¿¡å·å¤„ç†
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+        
+    def _signal_handler(self, signum, frame):
+        """ä¿¡å·å¤„ç†å™¨"""
+        logging.info(f"æ”¶åˆ°ä¿¡å· {signum}ï¼Œå‡†å¤‡å…³é—­æœåŠ¡å™¨...")
+        self.stop()
+        sys.exit(0)
+        
+    def _init_node_from_config(self):
+        """ä»é…ç½®æ–‡ä»¶åˆå§‹åŒ–èŠ‚ç‚¹"""
+        try:
+            # è·å–èŠ‚ç‚¹é…ç½®
+            node_config = self.config_manager.get_node_config()
+            lora_params = self.config_manager.get_lora_params()
+            timing_params = self.config_manager.get_timing_params()
+            
+            # è®¾ç½®èŠ‚ç‚¹ç±»å‹
+            node_type = node_config['node_type']
+            self.message_processor.set_node_type(node_type)
+            
+            # é…ç½®LoRaå¤„ç†å™¨
+            lora_processor = self.message_processor.lora_processor
+            
+            # åŸºæœ¬é…ç½®
+            lora_processor.local_id = node_config['local_id']
+            lora_processor.sys_para.update({
+                'net_id': node_config['network_id'],
+                'mother_id': node_config['mother_id'],
+                'gateway_id': node_config['gateway_id'],
+                'clust_id': node_config['cluster_id']
+            })
+            
+            # LoRaå‚æ•°é…ç½®
+            lora_processor.send_sig_para = {
+                'sig_fre': lora_params['forward_frequency'],
+                'sig_SF': lora_params['forward_sf'],
+                'sig_CR': lora_params['forward_cr'],
+                'sig_bw': lora_params['bandwidth'],
+                'sig_pow': lora_params['power_level']
+            }
+            
+            lora_processor.recv_sig_para = {
+                'sig_fre': lora_params['backward_frequency'],
+                'sig_SF': lora_params['backward_sf'],
+                'sig_CR': lora_params['backward_cr'],
+                'sig_bw': lora_params['bandwidth']
+            }
+            
+            # æ—¶åºå‚æ•°é…ç½®
+            lora_processor.node_data.update({
+                'node_period': timing_params['node_status_period'],
+                'sat_period': timing_params['satellite_status_period'],
+                'paload_period': timing_params['payload_period']
+            })
+            
+            logging.info(f"èŠ‚ç‚¹åˆå§‹åŒ–å®Œæˆ: ç±»å‹={node_type}, ID={node_config['local_id']}")
+            
+        except Exception as e:
+            logging.error(f"èŠ‚ç‚¹åˆå§‹åŒ–å¤±è´¥: {e}")
+            raise
     
     def start(self):
-        """Æô¶¯ºóÌ¨·şÎñÆ÷"""
+        """å¯åŠ¨åå°æœåŠ¡å™¨"""
+        if self.running:
+            logging.warning("æœåŠ¡å™¨å·²ç»åœ¨è¿è¡Œä¸­")
+            return
+            
         try:
             bind_ip = self.config_manager.get_bind_ip()
             
-            # ´´½¨²¢Æô¶¯UDP·şÎñÆ÷
+            # åˆ›å»ºå¹¶å¯åŠ¨UDPæœåŠ¡å™¨
             server_configs = [
                 ('host_software_port', MessageSource.HOST_SOFTWARE),
                 ('gateway_port', MessageSource.GATEWAY),
@@ -258,59 +115,164 @@ class BackendServer:
                 server.start()
                 self.servers[source] = server
             
-            # Æô¶¯ÏûÏ¢´¦ÀíÆ÷
+            # è®¾ç½®æ¶ˆæ¯å¤„ç†å™¨çš„UDPæœåŠ¡å™¨å¼•ç”¨
+            self.message_processor.set_udp_servers(self.servers)
+            
+            # å¯åŠ¨æ¶ˆæ¯å¤„ç†å™¨
             self.message_processor.start()
             
-            logging.info("ºóÌ¨·şÎñÆ÷Æô¶¯³É¹¦")
+            self.running = True
+            
+            # æ‰“å°å¯åŠ¨ä¿¡æ¯
+            node_config = self.config_manager.get_node_config()
+            logging.info("=" * 60)
+            logging.info("UDPåå°æœåŠ¡å™¨å¯åŠ¨æˆåŠŸ")
+            logging.info("=" * 60)
+            logging.info(f"èŠ‚ç‚¹ç±»å‹: {node_config['node_type']}")
+            logging.info(f"èŠ‚ç‚¹ID: {node_config['local_id']}")
+            logging.info(f"æ¯æ˜ŸID: {node_config['mother_id']}")
+            logging.info(f"ç½‘å…³ID: {node_config['gateway_id']}")
+            logging.info("æ¶ˆæ¯æ ¼å¼: [ç±»å‹(1å­—èŠ‚)][é•¿åº¦(1å­—èŠ‚)][å†…å®¹][CRC(2å­—èŠ‚)]")
+            logging.info("=" * 60)
+            logging.info("ç«¯å£ç›‘å¬:")
+            for source, server in self.servers.items():
+                logging.info(f"  {source.value}: {server.get_local_address()}")
+            logging.info("=" * 60)
             
         except Exception as e:
-            logging.error(f"Æô¶¯ºóÌ¨·şÎñÆ÷Ê§°Ü: {e}")
+            logging.error(f"å¯åŠ¨åå°æœåŠ¡å™¨å¤±è´¥: {e}")
             self.stop()
             raise
     
     def stop(self):
-        """Í£Ö¹ºóÌ¨·şÎñÆ÷"""
-        logging.info("ÕıÔÚÍ£Ö¹ºóÌ¨·şÎñÆ÷...")
+        """åœæ­¢åå°æœåŠ¡å™¨"""
+        if not self.running:
+            return
+            
+        logging.info("æ­£åœ¨åœæ­¢åå°æœåŠ¡å™¨...")
+        self.running = False
         
-        # Í£Ö¹ËùÓĞUDP·şÎñÆ÷
+        # åœæ­¢æ‰€æœ‰UDPæœåŠ¡å™¨
         for server in self.servers.values():
             server.stop()
         
-        # Í£Ö¹ÏûÏ¢´¦ÀíÆ÷
+        # åœæ­¢æ¶ˆæ¯å¤„ç†å™¨
         self.message_processor.stop()
         
-        logging.info("ºóÌ¨·şÎñÆ÷ÒÑÍ£Ö¹")
+        logging.info("åå°æœåŠ¡å™¨å·²åœæ­¢")
     
     def get_queue_size(self) -> int:
-        """»ñÈ¡µ±Ç°¶ÓÁĞ´óĞ¡"""
+        """è·å–å½“å‰é˜Ÿåˆ—å¤§å°"""
         return self.message_queue.qsize()
+    
+    def get_node_status(self) -> Dict[str, Any]:
+        """è·å–èŠ‚ç‚¹çŠ¶æ€"""
+        lora_processor = self.message_processor.lora_processor
+        return {
+            'local_id': lora_processor.local_id,
+            'node_type': lora_processor.sys_para['node_mod'],
+            'link_status': lora_processor.link_sta,
+            'mother_id': lora_processor.sys_para['mother_id'],
+            'network_mode': lora_processor.sys_para['net_mod'],
+            'queue_size': self.get_queue_size(),
+            'servers_status': {source.value: server.is_running() for source, server in self.servers.items()}
+        }
+    
+    def set_node_mode(self, mode: int):
+        """è®¾ç½®èŠ‚ç‚¹ç½‘ç»œæ¨¡å¼"""
+        self.message_processor.lora_processor.sys_para['net_mod'] = mode
+        logging.info(f"è®¾ç½®ç½‘ç»œæ¨¡å¼ä¸º: {mode}")
+    
+    def trigger_network_join(self):
+        """è§¦å‘å…¥ç½‘æµç¨‹"""
+        self.message_processor.lora_processor.link_sta = 1
+        logging.info("è§¦å‘èŠ‚ç‚¹å…¥ç½‘æµç¨‹")
+    
+    def run_forever(self):
+        """è¿è¡ŒæœåŠ¡å™¨ç›´åˆ°æ‰‹åŠ¨åœæ­¢"""
+        try:
+            self.start()
+            
+            # ä¸»å¾ªç¯
+            while self.running:
+                try:
+                    # ç›‘æ§ç³»ç»ŸçŠ¶æ€
+                    queue_size = self.get_queue_size()
+                    if queue_size > 800:  # é˜Ÿåˆ—æ¥è¿‘æ»¡è½½æ—¶å‘Šè­¦
+                        logging.warning(f"æ¶ˆæ¯é˜Ÿåˆ—æ¥è¿‘æ»¡è½½: {queue_size}/1000")
+                    
+                    # æ£€æŸ¥æœåŠ¡å™¨çŠ¶æ€
+                    for source, server in self.servers.items():
+                        if not server.is_running():
+                            logging.error(f"{source.value} æœåŠ¡å™¨å·²åœæ­¢è¿è¡Œ")
+                    
+                    # æ¯5ç§’æ£€æŸ¥ä¸€æ¬¡
+                    threading.Event().wait(5)
+                    
+                except KeyboardInterrupt:
+                    logging.info("æ”¶åˆ°åœæ­¢ä¿¡å·")
+                    break
+                    
+        except Exception as e:
+            logging.error(f"ç¨‹åºè¿è¡Œå‡ºé”™: {e}")
+        finally:
+            self.stop()
+
+
+def print_usage():
+    """æ‰“å°ä½¿ç”¨è¯´æ˜"""
+    print("""
+UDP LoRa åå°æœåŠ¡å™¨
+==================
+
+ä½¿ç”¨æ–¹æ³•:
+    python main.py [é…ç½®æ–‡ä»¶]
+
+å‚æ•°:
+    é…ç½®æ–‡ä»¶    å¯é€‰ï¼Œé»˜è®¤ä¸º config.ini
+
+åŠŸèƒ½è¯´æ˜:
+    - ç›‘å¬3ä¸ªUDPç«¯å£ï¼šä¸Šä½æœºè½¯ä»¶ã€ç½‘å…³ã€LoRa
+    - æ”¯æŒæ ‡å‡†æ¶ˆæ¯æ ¼å¼ï¼š[ç±»å‹][é•¿åº¦][å†…å®¹][CRC]
+    - æ”¯æŒLoRaç»„ç½‘åè®®ï¼šæµ‹è·ã€æ³¨å†Œã€è½®è¯¢ç­‰
+    - æ”¯æŒæ¯æ˜Ÿã€ç°‡é¦–ã€æ™®é€šèŠ‚ç‚¹ä¸‰ç§æ¨¡å¼
+
+é…ç½®æ–‡ä»¶ç¤ºä¾‹:
+    [NODE_CONFIG]
+    node_type = mother    # èŠ‚ç‚¹ç±»å‹ï¼šmother/cluster/normal
+    local_id = 0         # æœ¬åœ°IDï¼ˆæ¯æ˜Ÿä¸º0ï¼‰
+    
+æŒ‰ Ctrl+C åœæ­¢æœåŠ¡å™¨
+""")
 
 
 def main():
-    """Ö÷º¯Êı"""
+    """ä¸»å‡½æ•°"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='UDP LoRa åå°æœåŠ¡å™¨')
+    parser.add_argument('config', nargs='?', default='config.ini', 
+                       help='é…ç½®æ–‡ä»¶è·¯å¾„ (é»˜è®¤: config.ini)')
+    parser.add_argument('--help-usage', action='store_true', 
+                       help='æ˜¾ç¤ºè¯¦ç»†ä½¿ç”¨è¯´æ˜')
+    
+    args = parser.parse_args()
+    
+    if args.help_usage:
+        print_usage()
+        return
+    
     server = None
     try:
-        server = BackendServer()
-        server.start()
+        # åˆ›å»ºå¹¶è¿è¡ŒæœåŠ¡å™¨
+        server = BackendServer(args.config)
+        server.run_forever()
         
-        # Ö÷Ñ­»·
-        while True:
-            try:
-                # ÕâÀï¿ÉÒÔÌí¼ÓÒ»Ğ©¼à¿ØÂß¼­
-                queue_size = server.get_queue_size()
-                if queue_size > 0:
-                    logging.debug(f"µ±Ç°¶ÓÁĞ´óĞ¡: {queue_size}")
-                
-                # Ã¿Ãë¼ì²éÒ»´Î
-                threading.Event().wait(1)
-                
-            except KeyboardInterrupt:
-                logging.info("ÊÕµ½Í£Ö¹ĞÅºÅ")
-                break
-                
+    except FileNotFoundError:
+        print(f"é”™è¯¯: é…ç½®æ–‡ä»¶ '{args.config}' ä¸å­˜åœ¨")
+        print("è¯·åˆ›å»ºé…ç½®æ–‡ä»¶æˆ–ä½¿ç”¨ --help-usage æŸ¥çœ‹è¯´æ˜")
     except Exception as e:
-        logging.error(f"³ÌĞòÔËĞĞ³ö´í: {e}")
-    finally:
+        print(f"å¯åŠ¨å¤±è´¥: {e}")
         if server:
             server.stop()
 
