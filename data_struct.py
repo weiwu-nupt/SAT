@@ -2,300 +2,300 @@ from dataclasses import dataclass, field
 from typing import List
 import numpy as np
 
-# =================== È«¾Ö±äÁ¿¶¨Òå ===================
+# =================== å…¨å±€å˜é‡å®šä¹‰ ===================
 
-# ÏµÍ³³£Á¿¶¨Òå
+# ç³»ç»Ÿå¸¸é‡å®šä¹‰
 PI = 32768
-recv_thred = 32000  # ĞÅºÅ¼ì²â»ù±¾ÃÅÏŞ
-TIME_BASE = 100  # »ù±¾Ê±¼ä´¦Àíµ¥Î»Îª100ms£¬Éè¼ÆµÄ»ù±¾Ê±¼äµ¥Î»Îª10ms,µÈÓÚ400000¸öÊ±ÖÓ
+recv_thred = 32000  # ä¿¡å·æ£€æµ‹åŸºæœ¬é—¨é™
+TIME_BASE = 100  # åŸºæœ¬æ—¶é—´å¤„ç†å•ä½ä¸º100msï¼Œè®¾è®¡çš„åŸºæœ¬æ—¶é—´å•ä½ä¸º10ms,ç­‰äº400000ä¸ªæ—¶é’Ÿ
 c_speed = 300000  # km/s
 
-# ½Úµã¹¤×÷Ä£Ê½ºÍ×´Ì¬
-node_work_mod = 0  # ½Úµã¹¤×÷Ä£Ê½£¬0 - µ¥»úÄ£Ê½£¬ 1 - ×éÍøÄ£Ê½
-link_sta = 0  # ½ÚµãÍøÂç×´Ì¬£¬0 - ¿ÕÏĞ£¬1 - ĞÅºÅËÑË÷×´Ì¬£¬2-»ñµÃÊ±¼äÍ¬²½£¬3-·¢ËÍÈëÍøÏûÏ¢£¬4-½ÓÊÕµ½Ó¦´ğÏûÏ¢Íê³ÉÈëÍø£¬5-Ä¸ĞÇ¶ªÊ§£¬6ÀëÍø
-sending_state = 0  # 0 Î´·¢ËÍĞÅºÅ£¬1Æô¶¯·¢ËÍĞÅºÅ£¬2ĞÅºÅ·¢ËÍ£¬3 ĞÅºÅ·¢ËÍÍê³É
-cluster_receiv_mod = 0  # ´ØÊ×Ä£Ê½ÏÂ½ÓÊÕĞÅºÅ·½Ê½£¬0½ÓÊÕ´ØĞÅºÅ£¬1¿ÉÒÔ½ÓÊÕÄ¸ĞÇĞÅºÅ
-recv_power = 0  # ½ÓÊÕĞÅºÅ¹¦ÂÊ
+# èŠ‚ç‚¹å·¥ä½œæ¨¡å¼å’ŒçŠ¶æ€
+node_work_mod = 0  # èŠ‚ç‚¹å·¥ä½œæ¨¡å¼ï¼Œ0 - å•æœºæ¨¡å¼ï¼Œ 1 - ç»„ç½‘æ¨¡å¼
+link_sta = 0  # èŠ‚ç‚¹ç½‘ç»œçŠ¶æ€ï¼Œ0 - ç©ºé—²ï¼Œ1 - ä¿¡å·æœç´¢çŠ¶æ€ï¼Œ2-è·å¾—æ—¶é—´åŒæ­¥ï¼Œ3-å‘é€å…¥ç½‘æ¶ˆæ¯ï¼Œ4-æ¥æ”¶åˆ°åº”ç­”æ¶ˆæ¯å®Œæˆå…¥ç½‘ï¼Œ5-æ¯æ˜Ÿä¸¢å¤±ï¼Œ6ç¦»ç½‘
+sending_state = 0  # 0 æœªå‘é€ä¿¡å·ï¼Œ1å¯åŠ¨å‘é€ä¿¡å·ï¼Œ2ä¿¡å·å‘é€ï¼Œ3 ä¿¡å·å‘é€å®Œæˆ
+cluster_receiv_mod = 0  # ç°‡é¦–æ¨¡å¼ä¸‹æ¥æ”¶ä¿¡å·æ–¹å¼ï¼Œ0æ¥æ”¶ç°‡ä¿¡å·ï¼Œ1å¯ä»¥æ¥æ”¶æ¯æ˜Ÿä¿¡å·
+recv_power = 0  # æ¥æ”¶ä¿¡å·åŠŸç‡
 
-polling_state = 0  # Êı¾İÑ¯ÎÊ·¢ËÍ×´Ì¬
-clust_operate = 0  # ´ØÊ×ÂÖÑ¯Ä£Ê½
-mod_convert = 0  # ÏµÍ³Ä£Ê½ÇĞ»»×´Ì¬
-mother_sat_convert = 0  # Ö÷¶¯Ä¸ĞÇÇĞ»»×´Ì¬
-clust_polling = 0  # Ä¸ĞÇ´ØÂÖÑ¯»¹ÊÇ½ÚµãÂÖÑ¯
-clust_polling_id = 0  # ´ØÂÖÑ¯ID, ´ØID > 0x80
-node_poliing_id = 0  # ½ÚµãÂÖÑ¯ID£¬½ÚµãID 0~127
-traffic_send_en = 0  # ±íÊ¾×Ö£¬ÓÃÓÚÖ¸Ê¾µ±Ç°ÊÇÒµÎñÊı¾İ·¢ËÍ×´Ì¬
+polling_state = 0  # æ•°æ®è¯¢é—®å‘é€çŠ¶æ€
+clust_operate = 0  # ç°‡é¦–è½®è¯¢æ¨¡å¼
+mod_convert = 0  # ç³»ç»Ÿæ¨¡å¼åˆ‡æ¢çŠ¶æ€
+mother_sat_convert = 0  # ä¸»åŠ¨æ¯æ˜Ÿåˆ‡æ¢çŠ¶æ€
+clust_polling = 0  # æ¯æ˜Ÿç°‡è½®è¯¢è¿˜æ˜¯èŠ‚ç‚¹è½®è¯¢
+clust_polling_id = 0  # ç°‡è½®è¯¢ID, ç°‡ID > 0x80
+node_poliing_id = 0  # èŠ‚ç‚¹è½®è¯¢IDï¼ŒèŠ‚ç‚¹ID 0~127
+traffic_send_en = 0  # è¡¨ç¤ºå­—ï¼Œç”¨äºæŒ‡ç¤ºå½“å‰æ˜¯ä¸šåŠ¡æ•°æ®å‘é€çŠ¶æ€
 
-time_out = 0  # ³¬Ê±ÉèÖÃ
+time_out = 0  # è¶…æ—¶è®¾ç½®
 
-send_fram_num = 0  # ·¢ËÍÊı¾İ°üÊıÄ¿
-recv_fram_err = 0  # ½ÓÊÕµÄ´íÎóÖ¡¼ÆÊı
-recv_fram_num = 0  # ÕıÈ·½ÓÊÕÖ¡¼ÆÊı
-recv_totle_num = 0  # ×ÜµÄ½ÓÊÕÖ¡¼ÆÊı
-recv_fram_self = 0  # ±¾½ÚµãÕıÈ·Ö¡¼ÆÊı
+send_fram_num = 0  # å‘é€æ•°æ®åŒ…æ•°ç›®
+recv_fram_err = 0  # æ¥æ”¶çš„é”™è¯¯å¸§è®¡æ•°
+recv_fram_num = 0  # æ­£ç¡®æ¥æ”¶å¸§è®¡æ•°
+recv_totle_num = 0  # æ€»çš„æ¥æ”¶å¸§è®¡æ•°
+recv_fram_self = 0  # æœ¬èŠ‚ç‚¹æ­£ç¡®å¸§è®¡æ•°
 
 to_convert_mother_id = 0
 
-# =================== Êı¾İ½á¹¹¶¨Òå ===================
+# =================== æ•°æ®ç»“æ„å®šä¹‰ ===================
 
 @dataclass
 class SysParaDef:
-    """ÍøÂç×´Ì¬²ÎÊı"""
-    net_mod: int = 0  # ÎïÁªÍøÄ£Ê½£¨0-6¸÷ÖÖÄ£Ê½£¬7-´ØÊ×µ÷¶ÈÄ£Ê½£¬8-×Ô×éÖ¯ÍøÄ£Ê½£©
-    node_mod: int = 0  # ½ÚµãÄ£Ê½£¬Ä¸ĞÇ¡¢´ØÊ×¡¢ÆÕÍ¨½Úµã
-    net_id: int = 0  # ÍøÂçID
-    mother_id: int = 0  # Ä¸ĞÇID
-    gateway_id: int = 0  # Íø¹ÜID
-    node_num: int = 0  # ÏµÍ³½ÚµãÊıÄ¿
-    max_id: int = 0  # ÏµÍ³×î´ó½ÚµãID
+    """ç½‘ç»œçŠ¶æ€å‚æ•°"""
+    net_mod: int = 0  # ç‰©è”ç½‘æ¨¡å¼ï¼ˆ0-6å„ç§æ¨¡å¼ï¼Œ7-ç°‡é¦–è°ƒåº¦æ¨¡å¼ï¼Œ8-è‡ªç»„ç»‡ç½‘æ¨¡å¼ï¼‰
+    node_mod: int = 0  # èŠ‚ç‚¹æ¨¡å¼ï¼Œæ¯æ˜Ÿã€ç°‡é¦–ã€æ™®é€šèŠ‚ç‚¹
+    net_id: int = 0  # ç½‘ç»œID
+    mother_id: int = 0  # æ¯æ˜ŸID
+    gateway_id: int = 0  # ç½‘ç®¡ID
+    node_num: int = 0  # ç³»ç»ŸèŠ‚ç‚¹æ•°ç›®
+    max_id: int = 0  # ç³»ç»Ÿæœ€å¤§èŠ‚ç‚¹ID
     
-    fre_forw: int = 0  # Ç°ÏòÆµÂÊ
-    bw_forw: int = 0  # Ç°ÏòĞÅºÅ´ø¿í
-    cr_forw: int = 0  # Ç°ÏòĞÅºÅ±àÂë
-    SF_base_forw: int = 0  # ×éÍø»ù±¾SF
-    SF_high_forw: int = 0  # ×î¸ßÔÊĞíSF
+    fre_forw: int = 0  # å‰å‘é¢‘ç‡
+    bw_forw: int = 0  # å‰å‘ä¿¡å·å¸¦å®½
+    cr_forw: int = 0  # å‰å‘ä¿¡å·ç¼–ç 
+    SF_base_forw: int = 0  # ç»„ç½‘åŸºæœ¬SF
+    SF_high_forw: int = 0  # æœ€é«˜å…è®¸SF
     
-    fre_backw: int = 0  # ·´ÏòÆµÂÊ
-    bw_backw: int = 0  # ·´ÏòĞÅºÅ´ø¿í
-    cr_backw: int = 0  # ·´ÏòĞÅºÅ±àÂë
-    SF_base_backw: int = 0  # ×éÍø»ù±¾SF
-    SF_high_backw: int = 0  # ×î¸ßÔÊĞíSF
+    fre_backw: int = 0  # åå‘é¢‘ç‡
+    bw_backw: int = 0  # åå‘ä¿¡å·å¸¦å®½
+    cr_backw: int = 0  # åå‘ä¿¡å·ç¼–ç 
+    SF_base_backw: int = 0  # ç»„ç½‘åŸºæœ¬SF
+    SF_high_backw: int = 0  # æœ€é«˜å…è®¸SF
     
-    clust_id: int = 0  # ´ØÊ×ID
-    clust_numb: int = 0  # ´Ø½ÚµãÊı
-    clust_node_id: List[int] = field(default_factory=lambda: [0] * 32)  # ´ØÄÚ½ÚµãID
+    clust_id: int = 0  # ç°‡é¦–ID
+    clust_numb: int = 0  # ç°‡èŠ‚ç‚¹æ•°
+    clust_node_id: List[int] = field(default_factory=lambda: [0] * 32)  # ç°‡å†…èŠ‚ç‚¹ID
     
-    clust_fre_forw: int = 0  # Ç°ÏòÆµÂÊ
-    clust_bw_forw: int = 0  # Ç°ÏòĞÅºÅ´ø¿í
-    clust_cr_forw: int = 0  # Ç°ÏòĞÅºÅ´ø¿í
-    clust_SF_base_forw: int = 0  # ×éÍø»ù±¾SF
+    clust_fre_forw: int = 0  # å‰å‘é¢‘ç‡
+    clust_bw_forw: int = 0  # å‰å‘ä¿¡å·å¸¦å®½
+    clust_cr_forw: int = 0  # å‰å‘ä¿¡å·å¸¦å®½
+    clust_SF_base_forw: int = 0  # ç»„ç½‘åŸºæœ¬SF
     
-    clust_fre_backw: int = 0  # ·´ÏòÆµÂÊ
-    clust_bw_backw: int = 0  # ·´ÏòĞÅºÅ´ø¿í
-    clust_cr_backw: int = 0  # ·´ÏòĞÅºÅ´ø¿í
-    clust_SF_base_backw: int = 0  # ×éÍø»ù±¾SF
+    clust_fre_backw: int = 0  # åå‘é¢‘ç‡
+    clust_bw_backw: int = 0  # åå‘ä¿¡å·å¸¦å®½
+    clust_cr_backw: int = 0  # åå‘ä¿¡å·å¸¦å®½
+    clust_SF_base_backw: int = 0  # ç»„ç½‘åŸºæœ¬SF
     
-    sys_sig_mod: int = 0  # ĞÅºÅÄ£Ê½£¬0´«Í³ĞÅºÅ£¬1×ÔÊÊÓ¦ĞÅºÅ¸ñÊ½
-    convert_mod: int = 0  # ¹ã²¥ÏûÏ¢ÄÚµÄ×´Ì¬ÇĞ»»Ö¸Ê¾
+    sys_sig_mod: int = 0  # ä¿¡å·æ¨¡å¼ï¼Œ0ä¼ ç»Ÿä¿¡å·ï¼Œ1è‡ªé€‚åº”ä¿¡å·æ ¼å¼
+    convert_mod: int = 0  # å¹¿æ’­æ¶ˆæ¯å†…çš„çŠ¶æ€åˆ‡æ¢æŒ‡ç¤º
     
-    wake_mod: int = 0  # ¿Õ¿Ú»½ĞÑÄ£Ê½
-    perm_period: int = 0  # Òì³£ÉÏ±¨ĞíÖÜÆÚ
+    wake_mod: int = 0  # ç©ºå£å”¤é†’æ¨¡å¼
+    perm_period: int = 0  # å¼‚å¸¸ä¸ŠæŠ¥è®¸å‘¨æœŸ
     
-    sys_fram_period: int = 0  # ÏµÍ³Ö¡ÖÜÆÚ³¤¶È
-    burst_time_base: int = 0  # Ñ¯ÎÊÍ»·¢¶Ô¶ÔÆëÊ±¼ä
+    sys_fram_period: int = 0  # ç³»ç»Ÿå¸§å‘¨æœŸé•¿åº¦
+    burst_time_base: int = 0  # è¯¢é—®çªå‘å¯¹å¯¹é½æ—¶é—´
     
-    sig_det_time: int = 0  # ĞÅºÅ¼ì²âÊ±¼ä£¬µ¥Î»ºÁÃë
-    node_sta_det: int = 3  # ½Úµã×´Ì¬¼à²â´ÎÊı£¬Ä¬ÈÏ3
+    sig_det_time: int = 0  # ä¿¡å·æ£€æµ‹æ—¶é—´ï¼Œå•ä½æ¯«ç§’
+    node_sta_det: int = 3  # èŠ‚ç‚¹çŠ¶æ€ç›‘æµ‹æ¬¡æ•°ï¼Œé»˜è®¤3
     
-    un_permit: int = 0  # Òì³£ÉÏ±¨ÔÊĞí
+    un_permit: int = 0  # å¼‚å¸¸ä¸ŠæŠ¥å…è®¸
 
 
 @dataclass
 class NodeAbilityDef:
-    """½Úµã²ÎÊı"""
-    mac_addr: List[int] = field(default_factory=lambda: [0] * 3)  # MACµØÖ·
-    ip_addr: List[int] = field(default_factory=lambda: [0] * 4)  # IPµØÖ·£¨±£Áô£©
-    sig_mod: int = 0  # ²ÉÓÃĞÅºÅÄ£Ê½£¬0 ³£¹æ£¬1 ×ÔÊÊÓ¦
-    data_mod: int = 0  # Êı¾İ°×»¯´¦Àí
-    pps_mod: int = 0  # Íâ²¿²Î¿¼
-    link_numb: int = 0  # ÎÀĞÇÖ§³ÖµÄÍâ²¿Á´½ÓÄÜÁ¦
-    low_SF: int = 6  # ×îµÍSF£¬6
-    high_SF: int = 12  # ×î¸ßSF£¬12
-    Freq_range: int = 0  # ÆµÂÊÊÊÓ¦·¶Î§
-    max_Pow: int = 0  # ×î´óÊä³ö¹¦ÂÊ
-    wake_period: int = 0  # ĞÅºÅ»½ĞÑÖÜÆÚ
-    wake_time: int = 0  # ĞÅºÅ»½ĞÑÊ±¼ä
-    node_ability: int = 0  # ½ÚµãÄÜÁ¦
-    Pow_att: int = 0  # ×î´ó¹¦ÂÊË¥¼õ·¶Î§30dB
-    locat_x: int = 0  # ¿Õ¼ä×ø±êx
-    locat_y: int = 0  # ¿Õ¼ä×ø±êy
-    locat_z: int = 0  # ¿Õ¼ä×ø±êz
+    """èŠ‚ç‚¹å‚æ•°"""
+    mac_addr: List[int] = field(default_factory=lambda: [0] * 3)  # MACåœ°å€
+    ip_addr: List[int] = field(default_factory=lambda: [0] * 4)  # IPåœ°å€ï¼ˆä¿ç•™ï¼‰
+    sig_mod: int = 0  # é‡‡ç”¨ä¿¡å·æ¨¡å¼ï¼Œ0 å¸¸è§„ï¼Œ1 è‡ªé€‚åº”
+    data_mod: int = 0  # æ•°æ®ç™½åŒ–å¤„ç†
+    pps_mod: int = 0  # å¤–éƒ¨å‚è€ƒ
+    link_numb: int = 0  # å«æ˜Ÿæ”¯æŒçš„å¤–éƒ¨é“¾æ¥èƒ½åŠ›
+    low_SF: int = 6  # æœ€ä½SFï¼Œ6
+    high_SF: int = 12  # æœ€é«˜SFï¼Œ12
+    Freq_range: int = 0  # é¢‘ç‡é€‚åº”èŒƒå›´
+    max_Pow: int = 0  # æœ€å¤§è¾“å‡ºåŠŸç‡
+    wake_period: int = 0  # ä¿¡å·å”¤é†’å‘¨æœŸ
+    wake_time: int = 0  # ä¿¡å·å”¤é†’æ—¶é—´
+    node_ability: int = 0  # èŠ‚ç‚¹èƒ½åŠ›
+    Pow_att: int = 0  # æœ€å¤§åŠŸç‡è¡°å‡èŒƒå›´30dB
+    locat_x: int = 0  # ç©ºé—´åæ ‡x
+    locat_y: int = 0  # ç©ºé—´åæ ‡y
+    locat_z: int = 0  # ç©ºé—´åæ ‡z
 
 
-# È«¾ÖÊµÀı
-local_id = 0  # ±¾»ú½ÚµãID
-sys_para = SysParaDef()  # ÏµÍ³²ÎÊı
-node_para = NodeAbilityDef()  # ½Úµã²ÎÊı
+# å…¨å±€å®ä¾‹
+local_id = 0  # æœ¬æœºèŠ‚ç‚¹ID
+sys_para = SysParaDef()  # ç³»ç»Ÿå‚æ•°
+node_para = NodeAbilityDef()  # èŠ‚ç‚¹å‚æ•°
 
 
 @dataclass
 class LoraSigDef:
-    """ĞÅºÅ²ÎÊı"""
+    """ä¿¡å·å‚æ•°"""
     sig_fre: int = 0  # 100Hz
     sig_bw: int = 0  # 0 - 125kHz,1 - 250kHz,2 - 500kHz, 3 - 1MHz
-    sig_pow: int = 0  # Êı×ÖÓòĞÅºÅ¹¦ÂÊ
+    sig_pow: int = 0  # æ•°å­—åŸŸä¿¡å·åŠŸç‡
     sig_SF: int = 0  # 6~12
     sig_CR: int = 0  # 0-4/5,1-4/6,2-4/7,3-4/8
     head_mod: int = 0  # 1 to enable head
-    CRC_head: int = 0  # Í·Êı¾İ°üCRC±àÂëÊ¹ÄÜ
-    CRC_data: int = 0  # Êı¾İCRCÊ¹ÄÜ
-    dat_wit: int = 0  # ĞÅºÅ°×»¯Ê¹ÄÜ
-    sig_ldr: int = 0  # µÍËÙÊı¾İÄ£Ê½
-    sig_mod: int = 0  # ĞÅºÅ·½Ê½£¬1Îª×Ô¶¨Òå±ßSF£¬0Îª³£¹æ
-    FPGA_int: int = 0  # 1 FPGAÊµÏÖ½»Ö¯±àÂë
+    CRC_head: int = 0  # å¤´æ•°æ®åŒ…CRCç¼–ç ä½¿èƒ½
+    CRC_data: int = 0  # æ•°æ®CRCä½¿èƒ½
+    dat_wit: int = 0  # ä¿¡å·ç™½åŒ–ä½¿èƒ½
+    sig_ldr: int = 0  # ä½é€Ÿæ•°æ®æ¨¡å¼
+    sig_mod: int = 0  # ä¿¡å·æ–¹å¼ï¼Œ1ä¸ºè‡ªå®šä¹‰è¾¹SFï¼Œ0ä¸ºå¸¸è§„
+    FPGA_int: int = 0  # 1 FPGAå®ç°äº¤ç»‡ç¼–ç 
 
 
-send_sig_para = LoraSigDef()  # ·¢ËÍĞÅºÅ²ÎÊı
-recv_sig_para = LoraSigDef()  # ½ÓÊÕĞÅºÅ²ÎÊı
+send_sig_para = LoraSigDef()  # å‘é€ä¿¡å·å‚æ•°
+recv_sig_para = LoraSigDef()  # æ¥æ”¶ä¿¡å·å‚æ•°
 
 
 @dataclass
 class LoraSendDef:
-    """·¢ËÍÊı¾İ²ÎÊı"""
-    adpt_SF: int = 0  # ×ÔÊÊÓ¦SF
-    adpt_CR: int = 0  # ×ÔÊÊÓ¦ÂëËÙÂÊ
-    pay_len: int = 0  # Êı¾İ³¤¶È
-    sym_len: int = 0  # ·ûºÅ³¤¶È
+    """å‘é€æ•°æ®å‚æ•°"""
+    adpt_SF: int = 0  # è‡ªé€‚åº”SF
+    adpt_CR: int = 0  # è‡ªé€‚åº”ç é€Ÿç‡
+    pay_len: int = 0  # æ•°æ®é•¿åº¦
+    sym_len: int = 0  # ç¬¦å·é•¿åº¦
     head_crc: int = 0  # head data CRC
-    send_time_en: int = 0  # ¶¨Ê±·¢ËÍÊ¹ÄÜ
-    send_time: int = 0  # ¶¨Ê±·¢ËÍÊ±¼ä
-    send_time_stamp: int = 0  # ·¢ËÍÊ±¼ä´Á
-    send_dat: List[int] = field(default_factory=lambda: [0] * 256)  # ·¢ËÍÊı¾İ
+    send_time_en: int = 0  # å®šæ—¶å‘é€ä½¿èƒ½
+    send_time: int = 0  # å®šæ—¶å‘é€æ—¶é—´
+    send_time_stamp: int = 0  # å‘é€æ—¶é—´æˆ³
+    send_dat: List[int] = field(default_factory=lambda: [0] * 256)  # å‘é€æ•°æ®
 
 
-Lora_send_data = LoraSendDef()  # ·¢ËÍÊı¾İ²ÎÊı
+Lora_send_data = LoraSendDef()  # å‘é€æ•°æ®å‚æ•°
 
 
 @dataclass
 class RecvDatprocDef:
-    """½ÓÊÕÊı¾İ´¦Àí"""
-    recv_new: int = 0  # ĞÂ½ÓÊÕÊı¾İ
-    recv_length: int = 0  # µ±Ç°½ÓÊÕÏûÏ¢³¤¶È
-    recv_time: int = 0  # ½ÓÊÕĞÅºÅÊ±¼ä´Á
-    recv_ok_time: int = 0  # ½ÓÊÕĞÅºÅÊ±¼ä
-    recv_SNR: int = 0  # ½ÓÊÕĞÅºÅĞÅÔë±È
-    recv_dat: List[int] = field(default_factory=lambda: [0] * 256)  # Êı¾İ´¦ÀíÁ÷³Ì
+    """æ¥æ”¶æ•°æ®å¤„ç†"""
+    recv_new: int = 0  # æ–°æ¥æ”¶æ•°æ®
+    recv_length: int = 0  # å½“å‰æ¥æ”¶æ¶ˆæ¯é•¿åº¦
+    recv_time: int = 0  # æ¥æ”¶ä¿¡å·æ—¶é—´æˆ³
+    recv_ok_time: int = 0  # æ¥æ”¶ä¿¡å·æ—¶é—´
+    recv_SNR: int = 0  # æ¥æ”¶ä¿¡å·ä¿¡å™ªæ¯”
+    recv_dat: List[int] = field(default_factory=lambda: [0] * 256)  # æ•°æ®å¤„ç†æµç¨‹
 
 
 Lora_recv_data = RecvDatprocDef()
 
 
-# Æ½Ì¨ÔØºÉ½Ó¿Ú
-sat_recv_dat = [0] * 256  # ÎÀĞÇÆ½Ì¨½ÓÊÕÊı¾İ
-sat_send_dat = [0] * 256  # ÎÀĞÇÆ½Ì¨·¢ËÍÊı¾İ
-satint_send_en = 0  # ÎÀĞÇÆ½Ì¨Êı¾İ·¢ËÍÊ¹ÄÜ
+# å¹³å°è½½è·æ¥å£
+sat_recv_dat = [0] * 256  # å«æ˜Ÿå¹³å°æ¥æ”¶æ•°æ®
+sat_send_dat = [0] * 256  # å«æ˜Ÿå¹³å°å‘é€æ•°æ®
+satint_send_en = 0  # å«æ˜Ÿå¹³å°æ•°æ®å‘é€ä½¿èƒ½
 
 
 @dataclass
 class DataDef:
-    """Êı¾İ¶¨Òå"""
-    node_data: List[int] = field(default_factory=lambda: [0] * 32)  # ½Úµã×´Ì¬Êı¾İ
-    node_period: int = 0  # ½Úµã×´Ì¬Êı¾İÉÏ±¨ÖÜÆÚ
-    node_time: int = 0  # ÏÂÒ»´ÎÊı¾İÉÏ±¨Ê±¼ä
+    """æ•°æ®å®šä¹‰"""
+    node_data: List[int] = field(default_factory=lambda: [0] * 32)  # èŠ‚ç‚¹çŠ¶æ€æ•°æ®
+    node_period: int = 0  # èŠ‚ç‚¹çŠ¶æ€æ•°æ®ä¸ŠæŠ¥å‘¨æœŸ
+    node_time: int = 0  # ä¸‹ä¸€æ¬¡æ•°æ®ä¸ŠæŠ¥æ—¶é—´
     
-    sat_data: List[int] = field(default_factory=lambda: [0] * 32)  # ĞÇ×´Ì¬Êı¾İ
-    sat_period: int = 0  # ÎÀĞÇ×´Ì¬Êı¾İÉÏ±¨ÖÜÆÚ
-    sat_time: int = 0  # ÏÂÒ»´ÎÊı¾İÉÏ±¨Ê±¼ä
+    sat_data: List[int] = field(default_factory=lambda: [0] * 32)  # æ˜ŸçŠ¶æ€æ•°æ®
+    sat_period: int = 0  # å«æ˜ŸçŠ¶æ€æ•°æ®ä¸ŠæŠ¥å‘¨æœŸ
+    sat_time: int = 0  # ä¸‹ä¸€æ¬¡æ•°æ®ä¸ŠæŠ¥æ—¶é—´
     
-    payload_data: List[int] = field(default_factory=lambda: [0] * 32)  # ÔØºÉÊı¾İ
-    payload_len: int = 0  # Êı¾İ³¤¶È
-    paload_period: int = 0  # ÔØºÉÊı¾İ×´Ì¬Êı¾İÉÏ±¨ÖÜÆÚ
-    paload_time: int = 0  # ÏÂÒ»´ÎÊı¾İÉÏ±¨Ê±¼ä
-    paload_unnormal: int = 0  # ÔØºÉÊı¾İÒì³£±êÊ¶
+    payload_data: List[int] = field(default_factory=lambda: [0] * 32)  # è½½è·æ•°æ®
+    payload_len: int = 0  # æ•°æ®é•¿åº¦
+    paload_period: int = 0  # è½½è·æ•°æ®çŠ¶æ€æ•°æ®ä¸ŠæŠ¥å‘¨æœŸ
+    paload_time: int = 0  # ä¸‹ä¸€æ¬¡æ•°æ®ä¸ŠæŠ¥æ—¶é—´
+    paload_unnormal: int = 0  # è½½è·æ•°æ®å¼‚å¸¸æ ‡è¯†
 
 
-node_data = DataDef()  # ½ÚµãÊı¾İ²ÎÊı
+node_data = DataDef()  # èŠ‚ç‚¹æ•°æ®å‚æ•°
 
-# FPGA²Ù×÷
-fpga_opmod = 0  # FPGA¼Ä´æÆ÷¶ÁĞ´Ä£Ê½£¬0 ¶Á£¬1Ğ´
-fpga_opnum = 0  # FPGAÊı¾İ¶ÁĞ´´ÎÊı
+# FPGAæ“ä½œ
+fpga_opmod = 0  # FPGAå¯„å­˜å™¨è¯»å†™æ¨¡å¼ï¼Œ0 è¯»ï¼Œ1å†™
+fpga_opnum = 0  # FPGAæ•°æ®è¯»å†™æ¬¡æ•°
 
-# Íø¹Ü½Ó¿Ú
-netman_send_en = 0  # ÍøÂç¹ÜÀí½Ó¿ÚÊı¾İ·¢ËÍÊ¹ÄÜ
-netman_link_sta = 0  # ÍøÂçÁ¬½Ó×´Ì¬£¬0 Î´Á¬½Ó£¬1Á¬½Ó
-netman_new_dat = 0  # ĞÂÊı¾İĞèÒªÔÚLoraÁ´Â··¢ËÍ
-receive_to_netman = 0  # ½ÓÊÕÊı¾İĞèÒª»Ø´«µ½±¾µØ
+# ç½‘ç®¡æ¥å£
+netman_send_en = 0  # ç½‘ç»œç®¡ç†æ¥å£æ•°æ®å‘é€ä½¿èƒ½
+netman_link_sta = 0  # ç½‘ç»œè¿æ¥çŠ¶æ€ï¼Œ0 æœªè¿æ¥ï¼Œ1è¿æ¥
+netman_new_dat = 0  # æ–°æ•°æ®éœ€è¦åœ¨Loraé“¾è·¯å‘é€
+receive_to_netman = 0  # æ¥æ”¶æ•°æ®éœ€è¦å›ä¼ åˆ°æœ¬åœ°
 
-netman_recv_dat = [0] * 1024  # ´Ó¹ÜÀíµ¥Ôª½ÓÊÕÊı¾İ
-netman_send_dat = [0] * 1024  # ·¢ËÍµ½¹ÜÀíµ¥Ôª
+netman_recv_dat = [0] * 1024  # ä»ç®¡ç†å•å…ƒæ¥æ”¶æ•°æ®
+netman_send_dat = [0] * 1024  # å‘é€åˆ°ç®¡ç†å•å…ƒ
 
 
 @dataclass
 class NodeOperateDef:
-    """½Úµã²Ù×÷¶¨Òå"""
-    node_ope_en: int = 0  # ½Úµã²Ù×÷Ê¹ÄÜ
-    source_id: int = 0  # Ñ¯ÎÊid
-    node_opedata: List[int] = field(default_factory=lambda: [0] * 5)  # ²Ù×÷×Ö
+    """èŠ‚ç‚¹æ“ä½œå®šä¹‰"""
+    node_ope_en: int = 0  # èŠ‚ç‚¹æ“ä½œä½¿èƒ½
+    source_id: int = 0  # è¯¢é—®id
+    node_opedata: List[int] = field(default_factory=lambda: [0] * 5)  # æ“ä½œå­—
 
 
 @dataclass
 class MeasDisDef:
-    """¾àÀë²âÁ¿¶¨Òå"""
-    node_dis_en: int = 0  # ½Úµã¾àÀë²âÁ¿Ê¹ÄÜ
-    des_nod_id: int = 0  # Ä¿µÄ½ÚµãID
-    node_dis_dat: int = 0  # ½Úµã¾àÀë²âÁ¿Êı¾İ
+    """è·ç¦»æµ‹é‡å®šä¹‰"""
+    node_dis_en: int = 0  # èŠ‚ç‚¹è·ç¦»æµ‹é‡ä½¿èƒ½
+    des_nod_id: int = 0  # ç›®çš„èŠ‚ç‚¹ID
+    node_dis_dat: int = 0  # èŠ‚ç‚¹è·ç¦»æµ‹é‡æ•°æ®
 
 
 @dataclass
 class NodeAskDef:
-    """½ÚµãÑ¯ÎÊ¶¨Òå"""
-    node_ask_en: int = 0  # ½Úµã²Ù×÷Ê¹ÄÜ
-    source_id: int = 0  # Ñ¯ÎÊid
-    node_opedata: int = 0  # ²Ù×÷×Ö
+    """èŠ‚ç‚¹è¯¢é—®å®šä¹‰"""
+    node_ask_en: int = 0  # èŠ‚ç‚¹æ“ä½œä½¿èƒ½
+    source_id: int = 0  # è¯¢é—®id
+    node_opedata: int = 0  # æ“ä½œå­—
 
 
 @dataclass
 class TrafficDataDef:
-    """ÒµÎñÊı¾İ¶¨Òå"""
+    """ä¸šåŠ¡æ•°æ®å®šä¹‰"""
     traffic_pack: int = 0
     data_num: int = 0
     traffic_dat: List[int] = field(default_factory=lambda: [0] * 1024)
 
 
 traffic_data = TrafficDataDef()
-distanc_sta = [MeasDisDef() for _ in range(128)]  # ½Úµã¾àÀë²âÁ¿
-node_ask_sta = [NodeAskDef() for _ in range(128)]  # ½ÚµãÑ¯ÎÊ
-node_ope_sta = [NodeOperateDef() for _ in range(128)]  # ½Úµã²Ù×÷×´Ì¬´æ´¢
+distanc_sta = [MeasDisDef() for _ in range(128)]  # èŠ‚ç‚¹è·ç¦»æµ‹é‡
+node_ask_sta = [NodeAskDef() for _ in range(128)]  # èŠ‚ç‚¹è¯¢é—®
+node_ope_sta = [NodeOperateDef() for _ in range(128)]  # èŠ‚ç‚¹æ“ä½œçŠ¶æ€å­˜å‚¨
 
 
 @dataclass
 class NetnodeTabDef:
-    """ÍøÂçÁÚ¾Ó×´Ì¬"""
-    node_sta: int = 0  # ½Úµã×´Ì¬£¬0-²»ÔÚÏß£¬1-·¢ËÍÈëÍøÓ¦´ğ×¢²á£¬2-ÔÚÍøÕı³££¬3-Ç±·ü 4-¾²Ä¬
-    node_position: int = 0  # ½ÚµãÊôĞÔ£¬0Ä¸ĞÇ£¬1´ØÊ×£¬2-³£¹æ
-    cluster_id: int = 0  # ½ÚµãËùÔÚ´ØID
-    mac_addr: List[int] = field(default_factory=lambda: [0] * 3)  # MACµØÖ·
-    node_ability: int = 0  # ½ÚµãÄÜÁ¦
-    freq_rang: int = 0  # ÆµÂÊ·¶Î§
-    node_pow: int = 0  # ½ÚµãĞÅºÅ¹¦ÂÊ
+    """ç½‘ç»œé‚»å±…çŠ¶æ€"""
+    node_sta: int = 0  # èŠ‚ç‚¹çŠ¶æ€ï¼Œ0-ä¸åœ¨çº¿ï¼Œ1-å‘é€å…¥ç½‘åº”ç­”æ³¨å†Œï¼Œ2-åœ¨ç½‘æ­£å¸¸ï¼Œ3-æ½œä¼ 4-é™é»˜
+    node_position: int = 0  # èŠ‚ç‚¹å±æ€§ï¼Œ0æ¯æ˜Ÿï¼Œ1ç°‡é¦–ï¼Œ2-å¸¸è§„
+    cluster_id: int = 0  # èŠ‚ç‚¹æ‰€åœ¨ç°‡ID
+    mac_addr: List[int] = field(default_factory=lambda: [0] * 3)  # MACåœ°å€
+    node_ability: int = 0  # èŠ‚ç‚¹èƒ½åŠ›
+    freq_rang: int = 0  # é¢‘ç‡èŒƒå›´
+    node_pow: int = 0  # èŠ‚ç‚¹ä¿¡å·åŠŸç‡
     VGA: int = 0
-    pos_x: int = 0  # Î»ÖÃx
-    pos_y: int = 0  # Î»ÖÃy
-    pos_z: int = 0  # Î»ÖÃz
-    node_det_num: int = 3  # ½ÚµãÔÚÍøÁ¬Ğø¼ì²â´ÎÊı£¬³õÊ¼Öµ3
-    node_det_tim: int = 0  # ½Úµã¼ì²âÊ±¼ä
-    node_SF: int = 0  # SFÖµ
-    node_healty_sta: int = 0  # ½Úµã½¡¿µ×´Ì¬
+    pos_x: int = 0  # ä½ç½®x
+    pos_y: int = 0  # ä½ç½®y
+    pos_z: int = 0  # ä½ç½®z
+    node_det_num: int = 3  # èŠ‚ç‚¹åœ¨ç½‘è¿ç»­æ£€æµ‹æ¬¡æ•°ï¼Œåˆå§‹å€¼3
+    node_det_tim: int = 0  # èŠ‚ç‚¹æ£€æµ‹æ—¶é—´
+    node_SF: int = 0  # SFå€¼
+    node_healty_sta: int = 0  # èŠ‚ç‚¹å¥åº·çŠ¶æ€
 
 
-neighbor_node_sta = [NetnodeTabDef() for _ in range(128)]  # ÍøÂç½Úµã×´Ì¬±í
+neighbor_node_sta = [NetnodeTabDef() for _ in range(128)]  # ç½‘ç»œèŠ‚ç‚¹çŠ¶æ€è¡¨
 
 
 @dataclass
 class MotherSelectDef:
-    """Ä¸ĞÇÑ¡Ôñ¶¨Òå"""
-    netman_link: List[int] = field(default_factory=lambda: [0] * 128)  # ÍøÂç¹ÜÀí×´Ì¬
-    mother_score: List[int] = field(default_factory=lambda: [0] * 128)  # Ä¸ĞÇÒâÔ¸·ÖÊı
-    local_link: int = 0  # ±¾½ÚµãÆäËû²â¿ØÁ´½ÓµÄ×´Ì¬
+    """æ¯æ˜Ÿé€‰æ‹©å®šä¹‰"""
+    netman_link: List[int] = field(default_factory=lambda: [0] * 128)  # ç½‘ç»œç®¡ç†çŠ¶æ€
+    mother_score: List[int] = field(default_factory=lambda: [0] * 128)  # æ¯æ˜Ÿæ„æ„¿åˆ†æ•°
+    local_link: int = 0  # æœ¬èŠ‚ç‚¹å…¶ä»–æµ‹æ§é“¾æ¥çš„çŠ¶æ€
 
 
 node_mother_sta = MotherSelectDef()
 
-# Ê±¼äÏà¹Ø±äÁ¿
-second_count = 0  # ÃëÒÔÉÏ¼ÆÊı
-sub_sec_count = 0  # ÃëÒÔÏÂ¼ÆÊı
-mil_sec_count = 0  # ºÁÃë¼ÆÊı
-sub_sec_offset = 0  # ÃëÒÔÏÂ²ÎÊıÆ«²î
+# æ—¶é—´ç›¸å…³å˜é‡
+second_count = 0  # ç§’ä»¥ä¸Šè®¡æ•°
+sub_sec_count = 0  # ç§’ä»¥ä¸‹è®¡æ•°
+mil_sec_count = 0  # æ¯«ç§’è®¡æ•°
+sub_sec_offset = 0  # ç§’ä»¥ä¸‹å‚æ•°åå·®
 
-sys_base_time = 0  # ÏµÍ³Ê±¼ä»ù×¼
-next_base_time = 0  # ÏÂÒ»¸öÏµÍ³Ê±¼ä
-sys_time_offset = 0  # Ê±¼äÆ«²î
+sys_base_time = 0  # ç³»ç»Ÿæ—¶é—´åŸºå‡†
+next_base_time = 0  # ä¸‹ä¸€ä¸ªç³»ç»Ÿæ—¶é—´
+sys_time_offset = 0  # æ—¶é—´åå·®
 
-re_enter_time = 0  # ½ÚµãÔÙÈëÊ±¼ä
+re_enter_time = 0  # èŠ‚ç‚¹å†å…¥æ—¶é—´
 
-securit_data = 0x12345678  # ¹Ì¶¨Öµ
+securit_data = 0x12345678  # å›ºå®šå€¼
 
-# =================== FPGA µØÖ·¶¨Òå ===================
+# =================== FPGA åœ°å€å®šä¹‰ ===================
 
 FPGA_sys_con_addr = 0x0000
 FPGA_sys_ver_addr = 0x0001
@@ -305,60 +305,60 @@ FPGA_sts_count_addr = 0x0003  # system counter
 
 FPGA_send_base_addr = 0x0200
 FPGA_Inte_base_addr = 0x0600
-FPGA_send_contr_addr = 0x0000  # ·¢ËÍ¿ØÖÆ¼Ä´æÆ÷
-FPGA_send_amp_addr = 0x0001  # ĞÅºÅ·ù¶È
-FPGA_send_time_addr = 0x0002  # ·¢ËÍÊ±¼ä´Á
-FPGA_send_netid_addr = 0x0003  # ÍøÂçID
-FPGA_send_waitc_addr = 0x0004  # µÈ´ı¼ÆÊıÆ÷
-FPGA_send_head_addr = 0x0005  # °üÍ·Êı¾İ
-FPGA_send_len_addr = 0x0006  # ·ûºÅ³¤¶È¼Ä´æÆ÷
-FPGA_send_data_addr = 0x0007  # Êı¾İ¼Ä´æÆ÷
-FPGA_send_sendsta_addr = 0x0008  # ·¢ËÍ×´Ì¬¼Ä´æÆ÷
+FPGA_send_contr_addr = 0x0000  # å‘é€æ§åˆ¶å¯„å­˜å™¨
+FPGA_send_amp_addr = 0x0001  # ä¿¡å·å¹…åº¦
+FPGA_send_time_addr = 0x0002  # å‘é€æ—¶é—´æˆ³
+FPGA_send_netid_addr = 0x0003  # ç½‘ç»œID
+FPGA_send_waitc_addr = 0x0004  # ç­‰å¾…è®¡æ•°å™¨
+FPGA_send_head_addr = 0x0005  # åŒ…å¤´æ•°æ®
+FPGA_send_len_addr = 0x0006  # ç¬¦å·é•¿åº¦å¯„å­˜å™¨
+FPGA_send_data_addr = 0x0007  # æ•°æ®å¯„å­˜å™¨
+FPGA_send_sendsta_addr = 0x0008  # å‘é€çŠ¶æ€å¯„å­˜å™¨
 
 FPGA_recv_base_addr = 0x0400
-FPGA_recv_contr_addr = 0x0000  # ½ÓÊÕ¿ØÖÆ¼Ä´æÆ÷
-FPGA_recv_capt_addr = 0x0000  # ²¶»ñÃÅÏŞ
-FPGA_recv_netid_addr = 0x0000  # ÍøÂçID
-FPGA_recv_waitc_addr = 0x0000  # µÈ´ı¼ÆÊıÆ÷
-FPGA_recv_dlen_addr = 0x0000  # ½ÓÊÕÊı¾İ³¤¶È
-FPGA_recv_data_addr = 0x0000  # ½ÓÊÕÊı¾İ¼Ä´æÆ÷
-FPGA_recv_time_addr = 0x0000  # ½ÓÊÕÊ±¼ä´Á¼Ä´æÆ÷
+FPGA_recv_contr_addr = 0x0000  # æ¥æ”¶æ§åˆ¶å¯„å­˜å™¨
+FPGA_recv_capt_addr = 0x0000  # æ•è·é—¨é™
+FPGA_recv_netid_addr = 0x0000  # ç½‘ç»œID
+FPGA_recv_waitc_addr = 0x0000  # ç­‰å¾…è®¡æ•°å™¨
+FPGA_recv_dlen_addr = 0x0000  # æ¥æ”¶æ•°æ®é•¿åº¦
+FPGA_recv_data_addr = 0x0000  # æ¥æ”¶æ•°æ®å¯„å­˜å™¨
+FPGA_recv_time_addr = 0x0000  # æ¥æ”¶æ—¶é—´æˆ³å¯„å­˜å™¨
 
 
 @dataclass
 class SendConDef:
-    """·¢ËÍ¿ØÖÆ¶¨Òå"""
-    poll_ok: int = 0  # µ±Ç°½Úµã¡¢´ØÂÖÑ¯½áÊø
-    currend_id: int = 0  # µ±Ç°ÂÖÑ¯ID
-    recv_send_en: int = 0  # ½ÓÊÕÊı¾İĞèÒªÓ¦´ğ
-    fram_type: int = 0  # ½ÓÊÕÊı¾İ·½Ê½×Ö
-    time_send_en: int = 0  # °´ÕÕÊ±Ï¶ÂÖÑ¯Ê¹ÄÜ
-    unnormal_send_en: int = 0  # ÔØºÉÊı¾İÒì³£·¢ÉäÊ¹ÄÜ
-    netman_send_en: int = 0  # ÍøÂçÊı¾İ·¢ËÍÊ¹ÄÜ
+    """å‘é€æ§åˆ¶å®šä¹‰"""
+    poll_ok: int = 0  # å½“å‰èŠ‚ç‚¹ã€ç°‡è½®è¯¢ç»“æŸ
+    currend_id: int = 0  # å½“å‰è½®è¯¢ID
+    recv_send_en: int = 0  # æ¥æ”¶æ•°æ®éœ€è¦åº”ç­”
+    fram_type: int = 0  # æ¥æ”¶æ•°æ®æ–¹å¼å­—
+    time_send_en: int = 0  # æŒ‰ç…§æ—¶éš™è½®è¯¢ä½¿èƒ½
+    unnormal_send_en: int = 0  # è½½è·æ•°æ®å¼‚å¸¸å‘å°„ä½¿èƒ½
+    netman_send_en: int = 0  # ç½‘ç»œæ•°æ®å‘é€ä½¿èƒ½
 
 
-send_con = SendConDef()  # ·¢ËÍ¿ØÖÆ×´Ì¬¼Ä´æÆ÷Ïà¹Ø
+send_con = SendConDef()  # å‘é€æ§åˆ¶çŠ¶æ€å¯„å­˜å™¨ç›¸å…³
 
 
 @dataclass
 class InitDataDef:
-    """³õÊ¼»¯Êı¾İ¶¨Òå"""
-    node_work_mode: int = 1  # Ä¬ÈÏÎªµ¥»úÄ£Ê½
-    node_time_mode: int = 0  # ²»´æÔÚÍâ²¿Ê±¼äÍ¬²½
-    node_net_pos: int = 2  # ÍøÂç½ÚµãÎ»ÖÃ
-    net_forward_SF: int = 12  # ³õÊ¼»¯Ç°ÏòSF
-    net_forward_CR: int = 3  # ³õÊ¼»¯Ç°ÏòCR
-    net_forward_fre: int = 12000000  # ³õÊ¼»¯Ç°ÏòÆµÂÊ£¬µ¥Î»Îª100Hz
-    net_backward_SF: int = 12  # ³õÊ¼»¯·´ÏòSF
-    net_backward_CR: int = 3  # ³õÊ¼»¯·´ÏòCR
-    net_backward_fre: int = 12000000  # ³õÊ¼»¯·´ÏòÆµÂÊ
-    node_sigform: int = 1  # ĞÅºÅ¸ñÊ½
-    node_CRC_form: int = 0  # Êı¾İCRC½ûÖ¹
+    """åˆå§‹åŒ–æ•°æ®å®šä¹‰"""
+    node_work_mode: int = 1  # é»˜è®¤ä¸ºå•æœºæ¨¡å¼
+    node_time_mode: int = 0  # ä¸å­˜åœ¨å¤–éƒ¨æ—¶é—´åŒæ­¥
+    node_net_pos: int = 2  # ç½‘ç»œèŠ‚ç‚¹ä½ç½®
+    net_forward_SF: int = 12  # åˆå§‹åŒ–å‰å‘SF
+    net_forward_CR: int = 3  # åˆå§‹åŒ–å‰å‘CR
+    net_forward_fre: int = 12000000  # åˆå§‹åŒ–å‰å‘é¢‘ç‡ï¼Œå•ä½ä¸º100Hz
+    net_backward_SF: int = 12  # åˆå§‹åŒ–åå‘SF
+    net_backward_CR: int = 3  # åˆå§‹åŒ–åå‘CR
+    net_backward_fre: int = 12000000  # åˆå§‹åŒ–åå‘é¢‘ç‡
+    node_sigform: int = 1  # ä¿¡å·æ ¼å¼
+    node_CRC_form: int = 0  # æ•°æ®CRCç¦æ­¢
 
 
 init_data = InitDataDef()
 
-# Ñ­»·±äÁ¿
+# å¾ªç¯å˜é‡
 i = 0
 j = 0
 k = 0
@@ -367,58 +367,58 @@ temp1 = 0
 temp2 = 0
 temp3 = 0
 
-poll_cluster_id = 0  # µ±Ç°ÂÖÑ¯´ØID
-poll_node_id = 0  # µ±Ç°ÂÖÑ¯½ÚµãID
-wait_ack_sta = 0  # µÈ´ıÓ¦´ğ×´Ì¬
-mother_poll_sta = 0  # Ä¸ĞÇÂÖÑ¯×´Ì¬
-cluster_poll_sta = 0  # ´ØÊ×ÂÖÑ¯×´Ì¬
-multi_send_num = 0  # ¶à´Î·¢ËÍÊı¾İµÄ´ÎÊı¿ØÖÆ
+poll_cluster_id = 0  # å½“å‰è½®è¯¢ç°‡ID
+poll_node_id = 0  # å½“å‰è½®è¯¢èŠ‚ç‚¹ID
+wait_ack_sta = 0  # ç­‰å¾…åº”ç­”çŠ¶æ€
+mother_poll_sta = 0  # æ¯æ˜Ÿè½®è¯¢çŠ¶æ€
+cluster_poll_sta = 0  # ç°‡é¦–è½®è¯¢çŠ¶æ€
+multi_send_num = 0  # å¤šæ¬¡å‘é€æ•°æ®çš„æ¬¡æ•°æ§åˆ¶
 
-work_mod_convert = 0  # ÏµÍ³¹¤×÷ÔÚÇĞ»»Ä£Ê½
+work_mod_convert = 0  # ç³»ç»Ÿå·¥ä½œåœ¨åˆ‡æ¢æ¨¡å¼
 
 
 @dataclass
 class LoraSigDef2:
-    """LoraĞÅºÅ²ÎÊı2"""
-    send_CRC_data: int = 0  # Êı¾İCRC£¬¹Ì¶¨Îª0
-    send_sig_ldr: int = 0  # µÍËÙÀ©Õ¹Ä£Ê½£¬¹Ì¶¨Îª0
-    send_head_mod: int = 1  # ÊÇ·ñ°üº¬°üÍ·£»¹Ì¶¨Îª1
-    send_CRC_head: int = 1  # Í·Êı¾İĞ£ÑéÊ¹ÄÜ,¹Ì¶¨Îª1
-    send_cont: int = 0  # Á¬Ğø·¢ËÍÊ¹ÄÜ
-    send_FPGA_int: int = 0  # FPGA±àÂë½»Ö¯
+    """Loraä¿¡å·å‚æ•°2"""
+    send_CRC_data: int = 0  # æ•°æ®CRCï¼Œå›ºå®šä¸º0
+    send_sig_ldr: int = 0  # ä½é€Ÿæ‰©å±•æ¨¡å¼ï¼Œå›ºå®šä¸º0
+    send_head_mod: int = 1  # æ˜¯å¦åŒ…å«åŒ…å¤´ï¼›å›ºå®šä¸º1
+    send_CRC_head: int = 1  # å¤´æ•°æ®æ ¡éªŒä½¿èƒ½,å›ºå®šä¸º1
+    send_cont: int = 0  # è¿ç»­å‘é€ä½¿èƒ½
+    send_FPGA_int: int = 0  # FPGAç¼–ç äº¤ç»‡
     
-    recv_CRC_data: int = 0  # Êı¾İCRC£¬¹Ì¶¨Îª0
-    recv_sig_ldr: int = 0  # µÍËÙÀ©Õ¹Ä£Ê½£¬¹Ì¶¨Îª0
-    recv_head_mod: int = 1  # ÊÇ·ñ°üº¬°üÍ·£»¹Ì¶¨Îª1
-    recv_CRC_head: int = 1  # Í·Êı¾İĞ£ÑéÊ¹ÄÜ,¹Ì¶¨Îª1
-    recv_cont: int = 0  # Á¬Ğø½ÓÊÕÊÕÊ¹ÄÜ
-    recv_agc_en: int = 0  # AGC Ê¹ÄÜ
-    recv_FPGA_int: int = 0  # FPGA±àÂë½»Ö¯
+    recv_CRC_data: int = 0  # æ•°æ®CRCï¼Œå›ºå®šä¸º0
+    recv_sig_ldr: int = 0  # ä½é€Ÿæ‰©å±•æ¨¡å¼ï¼Œå›ºå®šä¸º0
+    recv_head_mod: int = 1  # æ˜¯å¦åŒ…å«åŒ…å¤´ï¼›å›ºå®šä¸º1
+    recv_CRC_head: int = 1  # å¤´æ•°æ®æ ¡éªŒä½¿èƒ½,å›ºå®šä¸º1
+    recv_cont: int = 0  # è¿ç»­æ¥æ”¶æ”¶ä½¿èƒ½
+    recv_agc_en: int = 0  # AGC ä½¿èƒ½
+    recv_FPGA_int: int = 0  # FPGAç¼–ç äº¤ç»‡
     
-    FPGA_sendxorrecv: int = 0  # ĞÅºÅÊÕ·¢¹ØÁª
-    SFD_ser_num: int = 0  # ËÑË÷SFDÊıÄ¿
+    FPGA_sendxorrecv: int = 0  # ä¿¡å·æ”¶å‘å…³è”
+    SFD_ser_num: int = 0  # æœç´¢SFDæ•°ç›®
     
-    recv_chan_det: int = 0  # ĞÅµÀ×´Ì¬¼ì²âÊ¹ÄÜ
-    dat_white: int = 0  # Êı¾İ°×»¯Ê¹ÄÜ
-    inter_syn: int = 0  # ¸ÉÈÅĞÅºÅÍ¬²½Ê¹ÄÜ
+    recv_chan_det: int = 0  # ä¿¡é“çŠ¶æ€æ£€æµ‹ä½¿èƒ½
+    dat_white: int = 0  # æ•°æ®ç™½åŒ–ä½¿èƒ½
+    inter_syn: int = 0  # å¹²æ‰°ä¿¡å·åŒæ­¥ä½¿èƒ½
     
-    precode_num: int = 0  # Ç°µ¼·ûºÅÊı
-    syn_word0: int = 0  # Í¬²½×Ö
+    precode_num: int = 0  # å‰å¯¼ç¬¦å·æ•°
+    syn_word0: int = 0  # åŒæ­¥å­—
     syn_word1: int = 0
     
-    send_pow: int = 0  # ĞÅºÅÊä³ö·ù¶È
+    send_pow: int = 0  # ä¿¡å·è¾“å‡ºå¹…åº¦
     
-    int_sf: int = 0  # ¸ÉÈÅĞÅºÅSF
-    int_pow: int = 0  # ¸ÉÈÅĞÅºÅ¹¦ÂÊ
+    int_sf: int = 0  # å¹²æ‰°ä¿¡å·SF
+    int_pow: int = 0  # å¹²æ‰°ä¿¡å·åŠŸç‡
     
-    noise_pow: int = 0  # ÔëÉùĞÅºÅ¹¦ÂÊ
-    noise_mod: int = 0  # ÔëÉùĞÅºÅÄ£Ê½
+    noise_pow: int = 0  # å™ªå£°ä¿¡å·åŠŸç‡
+    noise_mod: int = 0  # å™ªå£°ä¿¡å·æ¨¡å¼
 
 
 Lora_para = LoraSigDef2()
 
-# ³õÊ¼»¯Êı¾İ
+# åˆå§‹åŒ–æ•°æ®
 white_data = [0x00] * 256
-SF_table = [12,12,12,12,12,11,11,11,11,10,10,10,10,9,9,9,9,9,8,8,8,8,7,7,7,7,6,6,6,6] + [0] * 97  # ²¹Æëµ½127
-to_int_RF_fre = 0  # Ê¹ÄÜÆµÂÊ³õÊ¼»¯
-to_int_fpga = 0  # ³õÊ¼»¯FPGA
+SF_table = [12,12,12,12,12,11,11,11,11,10,10,10,10,9,9,9,9,9,8,8,8,8,7,7,7,7,6,6,6,6] + [0] * 97  # è¡¥é½åˆ°127
+to_int_RF_fre = 0  # ä½¿èƒ½é¢‘ç‡åˆå§‹åŒ–
+to_int_fpga = 0  # åˆå§‹åŒ–FPGA
